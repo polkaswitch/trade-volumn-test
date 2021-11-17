@@ -1,0 +1,42 @@
+// BSC
+
+
+SELECT SUM(trade."volumn") AS "total_volumn" FROM 
+(SELECT 
+event."fromToken", 
+event."amount", 
+token_price."price" AS "token_price", 
+token_price."decimals", 
+token_price."symbol", 
+token_price."contract_address", 
+token_price."minute",
+naive_token_price."price" AS "native_token_price",
+(CASE WHEN event."fromToken" = '\xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' THEN "amount" / 1e18 * naive_token_price."price" ELSE "amount" / 10^"decimals" * token_price."price" END) AS "volumn"
+FROM swing_bsc_single_chain."Switch_call_swap" event
+LEFT JOIN prices."usd" token_price 
+ON event."fromToken" = token_price."contract_address" AND token_price."minute" = date_trunc('minute', call_block_time) 
+LEFT JOIN prices."layer1_usd" naive_token_price
+ON naive_token_price."minute" = date_trunc('minute', call_block_time) AND event."fromToken" = '\xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' AND naive_token_price."symbol" = 'BNB'
+WHERE "call_success" = 'true') AS trade
+
+
+
+// Polygon
+
+SELECT SUM(trade."volumn") AS "total_volumn" FROM 
+(SELECT 
+event."fromToken", 
+event."amount", 
+event."call_success",
+token_price."price", 
+token_price."decimals", 
+token_price."symbol", 
+token_price."contract_address", 
+token_price."minute",
+"amount" / 10^"decimals" * "price" AS "volumn"
+FROM swing_polygon_single_chain."Switch_call_swap" event
+LEFT JOIN prices."usd" token_price 
+ON token_price."minute" = date_trunc('minute', call_block_time) 
+AND (CASE WHEN event."fromToken" = '\xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' THEN token_price."symbol" = 'MATIC' 
+ELSE event."fromToken" = token_price."contract_address"
+END) WHERE "call_success" = 'true' ORDER BY "volumn" DESC) AS trade
